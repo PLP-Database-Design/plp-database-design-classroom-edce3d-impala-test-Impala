@@ -1,0 +1,77 @@
+name: Autograding Tests
+on:
+  - push
+  - workflow_dispatch
+  - repository_dispatch
+permissions:
+  checks: write
+  actions: read
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      DB_DATABASE: bills
+      DB_USER: root
+      DB_PASSWORD: root
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Update and install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install mysql-server mysql-client -y
+
+      - name: Start MySQL
+        run: |
+          sudo /etc/init.d/mysql start
+          mysql -e "CREATE DATABASE IF NOT EXISTS $DB_DATABASE;" -u$DB_USER -p$DB_PASSWORD
+
+      - name: Execute SQL script
+        run: |
+          sudo mysql -u$DB_USER -p$DB_PASSWORD $DB_DATABASE < ./test.sql
+
+      - name: Verify table creation
+        run: |
+          TABLE_COUNT=$(sudo mysql -u$DB_USER -p$DB_PASSWORD --execute="USE $DB_DATABASE; SHOW TABLES;" | grep -c -e 'categories' -e 'customer')
+          if [ "$TABLE_COUNT" -ne 2 ]; then
+            echo "Error: Tables were not created successfully!"
+            exit 1
+          else
+            echo "Tables created successfully."
+          fi
+
+      - name: Verify data insertion into the customer table
+        run: |
+          CUSTOMER_COUNT=$(sudo mysql -u$DB_USER -p$DB_PASSWORD --execute="USE $DB_DATABASE; SELECT COUNT(*) FROM customer;" | tail -n 1)
+          if [ "$CUSTOMER_COUNT" -lt 4 ]; then
+            echo "Error: Data insertion into the customer table failed!"
+    if: github.actor != 'github-classroom[bot]'
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      # This is where you place your autograding tests
+      # For more information on this runner, see the documentation at: https://github.com/classroom-resources/autograding-io-grader
+      #
+      # For example, you could run a test suite like this:
+      # - name: Run tests
+      #   uses: classroom-resources/autograding-io-grader@v1
+      #     with:
+      #       test-name: Addition Test
+      #       id: addition-test
+      #       command: "./bin/add.sh"
+      #       input: 1 2
+      #       expected-output: 3
+      #       comparison-method: exact
+      #       timeout: 10
+    - name: Autograding Reporter
+      uses: classroom-resources/autograding-grading-reporter@v1
+      # For more information on this runner, see the documentation at https://github.com/classroom-resources/autograding-grading-reporter
+      # To output the results of the tests, you can use the
+      # autograding-grading-reporter action like this:
+      # env:
+      # ADDITION-TEST_RESULTS: "${{ steps.addition - test.outputs.result }}"
+      #     with:
+      #         runners: addition-test
